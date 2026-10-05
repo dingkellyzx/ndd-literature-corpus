@@ -1,0 +1,9 @@
+{
+  "graphs": [{
+    "nodes": [
+      {"id": "http://purl.obolibrary.org/obo/MONDO_0700092", "lbl": "neurodevelopmental disorder", "meta": {}},
+      {"id": "http://purl.obolibrary.org/obo/MONDO_0000002", "lbl": "Example syndrome", "meta": {"subsets": ["http://purl.obolibrary.org/obo/mondo#rare"], "synonyms": [{"pred": "hasExactSynonym", "val": "Example developmental syndrome"}], "xrefs": [{"val": "Orphanet:2"}]}}
+    ],
+    "edges": [{"sub": "http://purl.obolibrary.org/obo/MONDO_0000002", "pred": "is_a", "obj": "http://purl.obolibrary.org/obo/MONDO_0700092"}]
+  }]
+}

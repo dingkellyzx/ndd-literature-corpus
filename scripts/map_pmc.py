@@ -7,7 +7,7 @@ import pyarrow.parquet as pq
 
 from ndd_corpus.config import Settings
 from ndd_corpus.diseases.build_catalog import write_parquet
-from ndd_corpus.pmc.id_mapping import PmcIdConverter, map_pmcids
+from ndd_corpus.pmc.id_mapping import CachingConverter, PmcIdConverter, map_pmcids
 from ndd_corpus.utils.http import NcbiClient
 
 
@@ -31,7 +31,9 @@ def main() -> int:
     ) as client:
         rows = map_pmcids(
             articles,
-            converter=PmcIdConverter(client),
+            converter=CachingConverter(
+                PmcIdConverter(client), settings.paths.interim / "pmc/id_mapping_cache"
+            ),
             batch_size=settings.pmc.id_converter_batch_size,
         )
     write_parquet(rows, settings.paths.interim / "pmc/pmid_pmcid.parquet")
@@ -42,4 +44,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

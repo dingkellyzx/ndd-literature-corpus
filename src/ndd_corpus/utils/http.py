@@ -5,11 +5,19 @@ import os
 import tempfile
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import httpx
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadResult:
+    path: Path
+    sha256: str
+    downloaded: bool
 
 
 def sha256_file(path: str | Path, chunk_size: int = 1024 * 1024) -> str:
@@ -37,6 +45,21 @@ def atomic_write_bytes(path: str | Path, content: bytes) -> Path:
         temporary.unlink(missing_ok=True)
         raise
     return destination
+
+
+def ensure_download(
+    path: str | Path,
+    fetch: Callable[[], bytes],
+    *,
+    expected_sha256: str | None = None,
+) -> DownloadResult:
+    destination = Path(path)
+    if destination.is_file() and expected_sha256:
+        actual = sha256_file(destination)
+        if actual == expected_sha256:
+            return DownloadResult(destination, actual, False)
+    atomic_write_bytes(destination, fetch())
+    return DownloadResult(destination, sha256_file(destination), True)
 
 
 class RateLimiter:
@@ -100,17 +123,32 @@ class NcbiClient:
             request_values["api_key"] = self._api_key
         for attempt in range(self.max_retries + 1):
             self.rate_limiter.wait()
-            response = self.client.request(
-                method,
-                url,
-                params=request_values if params is not None else None,
-                data=request_values if data is not None else None,
-            )
+            try:
+                response = self.client.request(
+                    method,
+                    url,
+                    params=request_values if params is not None else None,
+                    data=request_values if data is not None else None,
+                )
+            except (httpx.TimeoutException, httpx.NetworkError) as error:
+                if attempt == self.max_retries:
+                    raise RuntimeError(
+                        f"NCBI request failed after {attempt + 1} attempts: "
+                        f"{type(error).__name__}"
+                    ) from None
+                time.sleep(min(2**attempt, 60))
+                continue
             if response.status_code not in {429, 500, 502, 503, 504}:
-                response.raise_for_status()
+                if response.is_error:
+                    raise RuntimeError(
+                        f"NCBI request failed with HTTP {response.status_code}"
+                    ) from None
                 return response
             if attempt == self.max_retries:
-                response.raise_for_status()
+                raise RuntimeError(
+                    f"NCBI request failed with HTTP {response.status_code} "
+                    f"after {attempt + 1} attempts"
+                ) from None
             retry_after = response.headers.get("Retry-After")
             delay = float(retry_after) if retry_after else min(2**attempt, 60)
             time.sleep(delay)
@@ -121,4 +159,3 @@ class NcbiClient:
 
     def post(self, url: str, *, data: Mapping[str, Any] | None = None) -> httpx.Response:
         return self.request("POST", url, data=data or {})
-

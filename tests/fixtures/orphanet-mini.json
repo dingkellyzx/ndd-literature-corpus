@@ -1,0 +1,11 @@
+{
+  "JDBOR": {"DisorderList": {"Disorder": [{
+    "OrphaCode": "2",
+    "Name": {"#text": "Example syndrome"},
+    "SynonymList": {"Synonym": ["ES syndrome"]},
+    "ExternalReferenceList": {"ExternalReference": [
+      {"Source": "MONDO", "Reference": "0000002"},
+      {"Source": "OMIM", "Reference": "600002"}
+    ]}
+  }]}}
+}

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any, Protocol
 
-from ndd_corpus.utils.http import NcbiClient
+from ndd_corpus.utils.http import NcbiClient, atomic_write_bytes
 
 ID_CONVERTER_URL = "https://www.ncbi.nlm.nih.gov/pmc/utils/idconv/v1.0/"
 
@@ -31,6 +34,30 @@ class PmcIdConverter:
             for record in records
             if isinstance(record, dict)
         ]
+
+
+class CachingConverter:
+    def __init__(self, converter: Converter, cache_dir: str | Path):
+        self.converter = converter
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def convert(self, pmids: tuple[str, ...]) -> list[dict[str, str]]:
+        key = hashlib.sha256(",".join(pmids).encode()).hexdigest()
+        path = self.cache_dir / f"{key}.json"
+        if path.is_file():
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, list) and all(isinstance(item, dict) for item in payload):
+                return [
+                    {str(name): str(value) for name, value in item.items()}
+                    for item in payload
+                ]
+        records = self.converter.convert(pmids)
+        atomic_write_bytes(
+            path,
+            json.dumps(records, indent=2, sort_keys=True).encode("utf-8") + b"\n",
+        )
+        return records
 
 
 def _chunks(values: list[str], size: int) -> Iterable[tuple[str, ...]]:
@@ -81,4 +108,3 @@ def map_pmcids(
                 "mapping_status": status,
             }
     return [output[str(article["pmid"])] for article in inputs]
-

@@ -9,7 +9,12 @@ import pyarrow.parquet as pq
 from ndd_corpus.config import Settings
 from ndd_corpus.diseases.build_catalog import write_parquet
 from ndd_corpus.pubmed.query_builder import build_disease_query, build_generic_query
-from ndd_corpus.pubmed.search import NcbiSearchBackend, partition_rows, partition_search
+from ndd_corpus.pubmed.search import (
+    CachingSearchBackend,
+    NcbiSearchBackend,
+    partition_rows,
+    partition_search,
+)
 from ndd_corpus.utils.http import NcbiClient
 
 
@@ -46,14 +51,24 @@ def main() -> int:
         max_retries=settings.network.max_retries,
         requests_per_second=rate,
     ) as client:
-        backend = NcbiSearchBackend(client)
+        backend = CachingSearchBackend(
+            NcbiSearchBackend(client), settings.paths.interim / "pubmed/search_cache"
+        )
         for index, query in enumerate(queries, start=1):
+            remaining = (
+                settings.debug.pubmed_limit - len({row["pmid"] for row in all_retrieval})
+                if settings.debug.enabled
+                else None
+            )
+            if remaining is not None and remaining <= 0:
+                break
             partitions = partition_search(
                 query,
                 settings.pubmed.start_year,
                 settings.pubmed.end_year,
                 backend=backend,
                 limit=settings.pubmed.partition_limit,
+                max_records=remaining,
             )
             retrieval, manifest = partition_rows(partitions)
             all_retrieval.extend(retrieval)
@@ -77,4 +92,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

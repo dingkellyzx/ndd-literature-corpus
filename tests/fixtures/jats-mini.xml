@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<article article-type="case-report"><front><article-meta>
+  <article-id pub-id-type="pmc">PMC10</article-id>
+  <article-id pub-id-type="pmid">123</article-id>
+  <article-id pub-id-type="doi">10.1/example</article-id>
+  <title-group><article-title>Example syndrome report</article-title></title-group>
+  <abstract><p>PMC abstract.</p></abstract>
+  <permissions><license license-type="CC BY"/></permissions>
+</article-meta></front><body>
+  <sec id="s1" sec-type="case-report"><title>Case report</title><p>Full text.</p></sec>
+</body></article>

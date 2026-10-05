@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ndd_corpus.pmc.id_mapping import map_pmcids
+from ndd_corpus.pmc.id_mapping import CachingConverter, map_pmcids
 
 
 class FakeConverter:
@@ -64,3 +64,12 @@ def test_converter_errors_are_failed_not_unmapped() -> None:
 
     assert rows[0]["mapping_status"] == "failed"
 
+
+def test_converter_cache_resumes_completed_batches(tmp_path) -> None:
+    source = FakeConverter()
+
+    first = CachingConverter(source, tmp_path).convert(("2", "3"))
+    second = CachingConverter(source, tmp_path).convert(("2", "3"))
+
+    assert first == second
+    assert source.batches == [("2", "3")]

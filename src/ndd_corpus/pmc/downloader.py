@@ -22,6 +22,14 @@ def _expected_md5(url: str) -> str | None:
     return values[0].casefold() if values else None
 
 
+def _download_url(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.scheme != "s3":
+        return url
+    result = f"https://{parsed.netloc}.s3.amazonaws.com/{parsed.path.lstrip('/')}"
+    return f"{result}?{parsed.query}" if parsed.query else result
+
+
 def download_article(
     metadata: dict[str, Any],
     downloader: Downloader,
@@ -42,7 +50,7 @@ def download_article(
         if not checkpoint.claim("pmc-download", task_key):
             raise RuntimeError(f"PMC download task is already running: {task_key}")
         try:
-            xml = downloader.get(xml_url)
+            xml = downloader.get(_download_url(xml_url))
             expected = _expected_md5(xml_url)
             actual = hashlib.md5(xml, usedforsecurity=False).hexdigest()
             if expected and actual != expected:
@@ -74,4 +82,3 @@ def download_article(
         "xml_path": xml_path,
         "sha256": sha256_file(xml_path),
     }
-

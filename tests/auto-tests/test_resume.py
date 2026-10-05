@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ndd_corpus.utils.checkpoint import CheckpointStore
-from ndd_corpus.utils.http import atomic_write_bytes, sha256_file
+from ndd_corpus.utils.http import atomic_write_bytes, ensure_download, sha256_file
 
 
 def test_atomic_write_has_no_partial_file(tmp_path: Path) -> None:
@@ -44,3 +44,19 @@ def test_completed_artifact_is_skipped_only_when_checksum_matches(tmp_path: Path
     assert store.is_complete("pubmed-fetch", "batch-1") is False
     assert store.status("pubmed-fetch", "batch-1") == "pending"
 
+
+def test_reference_download_reuses_checksum_valid_file(tmp_path: Path) -> None:
+    destination = tmp_path / "reference.json"
+    calls = 0
+
+    def fetch() -> bytes:
+        nonlocal calls
+        calls += 1
+        return b'{"release":"current"}'
+
+    first = ensure_download(destination, fetch)
+    second = ensure_download(destination, fetch, expected_sha256=first.sha256)
+
+    assert first.downloaded is True
+    assert second.downloaded is False
+    assert calls == 1

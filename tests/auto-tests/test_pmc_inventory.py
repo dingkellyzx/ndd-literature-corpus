@@ -106,3 +106,28 @@ def test_xml_download_rejects_bad_md5(tmp_path: Path) -> None:
             tmp_path / "articles",
         )
 
+
+def test_s3_xml_url_is_converted_to_anonymous_https(tmp_path: Path) -> None:
+    xml = b"<article/>"
+    digest = hashlib.md5(xml).hexdigest()  # noqa: S324 - upstream PMC checksum format
+    requested = []
+
+    class Downloader:
+        def get(self, url: str) -> bytes:
+            requested.append(url)
+            return xml
+
+    download_article(
+        {
+            "pmcid": "PMC10",
+            "version": 2,
+            "xml_url": f"s3://pmc-oa-opendata/PMC10.2/PMC10.2.xml?md5={digest}",
+        },
+        Downloader(),
+        CheckpointStore(tmp_path / "checkpoint.sqlite"),
+        tmp_path / "articles",
+    )
+
+    assert requested == [
+        f"https://pmc-oa-opendata.s3.amazonaws.com/PMC10.2/PMC10.2.xml?md5={digest}"
+    ]

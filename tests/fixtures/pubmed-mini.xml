@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PubmedArticleSet><PubmedArticle>
+  <MedlineCitation Status="MEDLINE"><PMID>123</PMID><Article>
+    <ArticleTitle>Example syndrome report</ArticleTitle>
+    <Abstract><AbstractText>PubMed abstract.</AbstractText></Abstract>
+    <Journal><Title>Example Journal</Title><JournalIssue><PubDate><Year>2025</Year></PubDate></JournalIssue></Journal>
+  </Article></MedlineCitation>
+  <PubmedData><ArticleIdList>
+    <ArticleId IdType="pubmed">123</ArticleId>
+    <ArticleId IdType="pmc">PMC10</ArticleId>
+    <ArticleId IdType="doi">10.1/example</ArticleId>
+  </ArticleIdList></PubmedData>
+</PubmedArticle></PubmedArticleSet>

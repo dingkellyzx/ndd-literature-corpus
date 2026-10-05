@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import calendar
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from pathlib import Path
 from typing import Protocol
 
 from ndd_corpus.pubmed.query_builder import SearchQuery
-from ndd_corpus.utils.http import NcbiClient
+from ndd_corpus.utils.http import NcbiClient, atomic_write_bytes
 
 ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 
@@ -101,6 +104,53 @@ class NcbiSearchBackend:
         return [str(identifier) for identifier in idlist]
 
 
+class CachingSearchBackend:
+    """Durable per-query/date cache that makes completed ESearch leaves reusable."""
+
+    def __init__(self, backend: SearchBackend, cache_dir: str | Path):
+        self.backend = backend
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _path(self, query: str, interval: DateInterval) -> Path:
+        key = hashlib.sha256(f"{query}\n{interval.label}".encode()).hexdigest()
+        return self.cache_dir / f"{key}.json"
+
+    def _read(self, query: str, interval: DateInterval) -> dict[str, object] | None:
+        path = self._path(query, interval)
+        if not path.is_file():
+            return None
+        value = json.loads(path.read_text(encoding="utf-8"))
+        return value if isinstance(value, dict) else None
+
+    def _write(self, query: str, interval: DateInterval, value: dict[str, object]) -> None:
+        atomic_write_bytes(
+            self._path(query, interval),
+            json.dumps(value, sort_keys=True).encode("utf-8") + b"\n",
+        )
+
+    def count(self, query: str, interval: DateInterval) -> int:
+        cached = self._read(query, interval)
+        count_value = cached.get("count") if cached is not None else None
+        if isinstance(count_value, int):
+            return count_value
+        count = self.backend.count(query, interval)
+        self._write(query, interval, {"count": count, "ids": None})
+        return count
+
+    def ids(self, query: str, interval: DateInterval, expected: int) -> list[str]:
+        cached = self._read(query, interval)
+        raw_ids = cached.get("ids") if cached is not None else None
+        cached_count = cached.get("count") if cached is not None else None
+        if isinstance(raw_ids, list) and isinstance(cached_count, int):
+            identifiers = [str(value) for value in raw_ids]
+            if cached_count == expected and len(set(identifiers)) == expected:
+                return identifiers
+        identifiers = self.backend.ids(query, interval, expected)
+        self._write(query, interval, {"count": expected, "ids": identifiers})
+        return identifiers
+
+
 def _months(year: int) -> list[DateInterval]:
     return [
         DateInterval(
@@ -132,6 +182,7 @@ def partition_search(
     *,
     backend: SearchBackend,
     limit: int = 9_999,
+    max_records: int | None = None,
 ) -> list[SearchPartition]:
     if start_year > end_year:
         raise ValueError("start_year must not exceed end_year")
@@ -140,19 +191,23 @@ def partition_search(
         for year in range(start_year, end_year + 1)
     ]
     completed: list[SearchPartition] = []
-    while pending:
+    retrieved_total = 0
+    while pending and (max_records is None or retrieved_total < max_records):
         interval = pending.pop(0)
         reported = backend.count(query.query, interval)
-        if reported > limit:
+        remaining = max_records - retrieved_total if max_records is not None else None
+        needs_debug_split = remaining is not None and reported > remaining
+        if reported > limit or needs_debug_split:
             if interval.is_year:
                 pending[0:0] = _months(interval.start.year)
                 continue
             if interval.is_month:
                 pending[0:0] = _days(interval)
                 continue
-            raise SearchCountMismatch(
-                f"single-day partition exceeds PubMed limit: {interval.label} count={reported}"
-            )
+            if reported > limit:
+                raise SearchCountMismatch(
+                    f"single-day partition exceeds PubMed limit: {interval.label} count={reported}"
+                )
         retrieved = backend.ids(query.query, interval, reported) if reported else []
         unique = tuple(sorted(set(retrieved), key=_pmid_sort_key))
         if len(unique) != reported:
@@ -168,6 +223,7 @@ def partition_search(
                 retrieved_at=datetime.now(UTC).isoformat(),
             )
         )
+        retrieved_total += len(unique)
     return sorted(completed, key=lambda part: part.interval)
 
 

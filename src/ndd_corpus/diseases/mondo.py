@@ -70,7 +70,8 @@ def parse_mondo(payload: dict[str, Any]) -> MondoGraph:
         mondo_id = _curie(str(raw_node.get("id", "")))
         if not mondo_id.startswith("MONDO:"):
             continue
-        meta = raw_node.get("meta") if isinstance(raw_node.get("meta"), dict) else {}
+        raw_meta = raw_node.get("meta")
+        meta: dict[str, Any] = raw_meta if isinstance(raw_meta, dict) else {}
         synonyms: dict[str, list[str]] = {"exact": [], "narrow": [], "related": []}
         for synonym in meta.get("synonyms", []):
             if not isinstance(synonym, dict) or not synonym.get("val"):
@@ -130,4 +131,3 @@ def descendants(graph: MondoGraph, root: str) -> list[MondoNode]:
         (graph.nodes[identifier] for identifier in visited if not graph.nodes[identifier].obsolete),
         key=lambda node: node.mondo_id,
     )
-

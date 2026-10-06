@@ -14,8 +14,8 @@ reference:
   orphanet_url: "https://www.orphadata.com/data/json/en_product1.json.tar.gz"
 
 pubmed:
-  start_year: 1900
-  end_year: 2026
+  start_year: 2010
+  end_year: 2020
   batch_size: 500
   generic_ndd_query: true
   disease_name_queries: true
@@ -48,4 +48,3 @@ debug:
   disease_limit: 10
   pubmed_limit: 100
   pmc_limit: 20
-

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from ndd_corpus.config import Settings
+from ndd_corpus.config import PubmedConfig, Settings
 
 
 def _write_config(path: Path) -> None:
@@ -60,3 +60,14 @@ def test_api_key_is_never_in_safe_configuration(tmp_path: Path) -> None:
     assert settings.safe_metadata()["ncbi_api_key_configured"] is True
     assert "ncbi_api_key" not in settings.safe_metadata()
 
+
+def test_default_pubmed_window_is_2010_through_2020() -> None:
+    defaults = PubmedConfig()
+    repository_root = Path(__file__).resolve().parents[2]
+    settings = Settings.load(
+        repository_root / "configs/default.yaml",
+        env={"NCBI_EMAIL": "owner@example.org"},
+    )
+
+    assert (defaults.start_year, defaults.end_year) == (2010, 2020)
+    assert (settings.pubmed.start_year, settings.pubmed.end_year) == (2010, 2020)

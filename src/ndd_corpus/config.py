@@ -29,8 +29,8 @@ class ReferenceConfig(BaseModel):
 
 
 class PubmedConfig(BaseModel):
-    start_year: int = 1900
-    end_year: int = 2026
+    start_year: int = 2010
+    end_year: int = 2020
     batch_size: int = Field(default=500, gt=0)
     generic_ndd_query: bool = True
     disease_name_queries: bool = True

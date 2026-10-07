@@ -70,6 +70,31 @@ def test_signal_matching_accepts_flexible_whitespace_but_not_word_fragments() ->
     assert signals.negative_signals == ["drug toxicity"]
 
 
+def test_signal_matching_accepts_plural_forms_of_listed_terms() -> None:
+    signals = detect_relevance_signals(
+        "Novel FOXG1 mutations and variants",
+        "Children with seizures had adverse effects; several genes and "
+        "health policies were discussed across screening programs.",
+    )
+
+    assert "genetic:mutation" in signals.positive_signals
+    assert "genetic:variant" in signals.positive_signals
+    assert "genetic:gene" in signals.positive_signals
+    assert "phenotype:seizure" in signals.positive_signals
+    assert signals.negative_signals == [
+        "health policy",
+        "adverse effect",
+        "screening program",
+    ]
+
+
+def test_plural_matching_does_not_accept_other_word_forms() -> None:
+    signals = detect_relevance_signals("Copy number variation", "Generic genesis.")
+
+    assert "genetic:variant" not in signals.positive_signals
+    assert "genetic:gene" not in signals.positive_signals
+
+
 def test_empty_metadata_has_no_deterministic_signals() -> None:
     signals = detect_relevance_signals("", "")
 

@@ -81,20 +81,34 @@ _NEGATIVE_TERMS: tuple[str, ...] = (
 )
 
 
-def _matches(text: str, phrase: str) -> bool:
-    parts = [re.escape(part) for part in phrase.split()]
-    pattern = rf"(?<!\w){r'\s+'.join(parts)}(?!\w)"
-    return re.search(pattern, text, flags=re.IGNORECASE) is not None
+def _plural_tolerant(word: str) -> str:
+    if len(word) > 1 and word.endswith("y") and word[-2] not in "aeiou":
+        return rf"{re.escape(word[:-1])}(?:y|ies)"
+    return rf"{re.escape(word)}(?:e?s)?"
+
+
+def _compile(phrase: str) -> re.Pattern[str]:
+    *leading, last = phrase.split()
+    parts = [re.escape(part) for part in leading] + [_plural_tolerant(last)]
+    return re.compile(rf"(?<!\w){r'\s+'.join(parts)}(?!\w)", flags=re.IGNORECASE)
+
+
+_POSITIVE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
+    (f"{group}:{phrase}", _compile(phrase))
+    for group, phrases in _POSITIVE_GROUPS
+    for phrase in phrases
+)
+_NEGATIVE_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = tuple(
+    (phrase, _compile(phrase)) for phrase in _NEGATIVE_TERMS
+)
 
 
 def detect_relevance_signals(title: str, abstract: str) -> RelevanceSignals:
-    """Detect configured evidence phrases without making a relevance decision."""
+    """Detect configured evidence phrases without making a relevance decision.
+
+    The final word of each phrase also matches its regular plural form.
+    """
     text = "\n".join(part for part in (title, abstract) if part)
-    positive = [
-        f"{group}:{phrase}"
-        for group, phrases in _POSITIVE_GROUPS
-        for phrase in phrases
-        if _matches(text, phrase)
-    ]
-    negative = [phrase for phrase in _NEGATIVE_TERMS if _matches(text, phrase)]
+    positive = [label for label, pattern in _POSITIVE_PATTERNS if pattern.search(text)]
+    negative = [label for label, pattern in _NEGATIVE_PATTERNS if pattern.search(text)]
     return RelevanceSignals(positive_signals=positive, negative_signals=negative)

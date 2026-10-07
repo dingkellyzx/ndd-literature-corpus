@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 RelevanceLabel = Literal["HIGH", "POSSIBLE", "LOW"]
 EvidenceType = Literal[
@@ -30,6 +30,8 @@ class RetrievalProvenance(BaseModel):
 
 
 class ClassificationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     relevance_label: RelevanceLabel
     evidence_types: list[EvidenceType] = Field(default_factory=list)
     reason: str = Field(min_length=1, max_length=500)

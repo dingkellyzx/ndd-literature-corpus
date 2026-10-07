@@ -135,13 +135,13 @@ without further review.
 - **Fixed (22cc4f9):** the debug report counted branches `generic_ndd`/`disease_name`,
   but the query builder emits `broad_ndd`/`disease`, so per-branch counts were always zero
   on real data.
-- **Not fixed — deterministic signals miss plurals.** `_matches` requires an exact word,
+- **Fixed in 0640baf — deterministic signals missed plurals.** `_matches` requires an exact word,
   and spec terms are singular, so "mutations", "variants", "seizures", "genes" and
   "adverse effects" do not fire `mutation`/`variant`/`seizure`/`gene`/`adverse effect`.
   `detect_relevance_signals("Novel FOXG1 mutations and variants", "children with seizures
   and adverse effects; genes")` returns no signals. In this run 1–3 papers per term lost
-  the signal entirely, and 19627427's "adverse effects" fired no negative signal. Fixing
-  this changes every request hash, so all papers would be reclassified.
+  the signal entirely, and 19627427's "adverse effects" fired no negative signal. The
+  final word of each phrase now also matches its regular plural.
 - **Upstream, out of scope — PMC sections are never joined.** `pmc/parser.py` reads only
   `article-id[@pub-id-type='pmc']`, but current PMC XML (JATS 1.4) uses `pmcid`, so all
   parsed PMC rows have `pmcid=None`. As a result `merge_corpus` drops all 216 sections and
@@ -156,12 +156,72 @@ stored. At this rate, 100k candidates would take about 24 days. Disabling thinki
 probably give a large speed-up, but it changes classifier behaviour and should be
 evaluated like any other tuning change.
 
-## Recommended next steps (pending decision)
+## Second run — plural signals fixed, thinking disabled
 
-1. Fix plural matching in `signals.py` (optional `s`/`es` suffix) with a regression test.
-2. Decide whether to disable Qwen3 thinking. If so, compare labels on these 100 papers
-   against this run before adopting it.
-3. Optionally tighten the prompt for the observed inconsistencies: acquired brain injury
-   is not an NDD; service-use and treatment-efficacy papers are `LOW` regardless of
-   disorder; `POSSIBLE` means insufficient metadata.
-4. Re-run screening on a debug window that includes disease-query papers.
+Changes: plural-tolerant signal matching (0640baf) and `relevance.think: false`, which
+sends `reasoning_effort: "none"` (5773445). Every request hash changed, so all 100 papers
+were reclassified. Baseline labels were kept for comparison.
+
+| | HIGH | POSSIBLE | LOW | Retained | Time | Errors |
+| --- | --- | --- | --- | --- | --- | --- |
+| First run (thinking on) | 63 | 13 | 24 | 76 | ~35 min (~21 s/paper) | 0 |
+| Second run (thinking off) | 48 | 24 | 28 | 72 | 385 s (3.9 s/paper) | 0 |
+
+Baseline (rows) × second run (columns); 73/100 agree:
+
+| | HIGH | POSSIBLE | LOW |
+| --- | --- | --- | --- |
+| HIGH | 47 | 12 | 4 |
+| POSSIBLE | 1 | 7 | 5 |
+| LOW | 0 | 5 | 19 |
+
+Deterministic signals changed for 30 papers. Papers with any negative signal went from
+1 to 2. Both target PMIDs remain `LOW` and rejected.
+
+### Newly rejected (9)
+
+- Consistent with the spec's `LOW` definition (treatment, intervention, or NDD incidental),
+  and fixing the treatment-paper inconsistency noted above: 19401504 (methylphenidate
+  response), 19441138 (Ginkgo biloba), 19697119 (computer-based intervention), 19649699
+  (ABA vs TEACCH), 19521350 (obesity prevalence across chronic conditions), 19439760
+  (simulating ADHD).
+- Borderline: 19669402 (bullying among adolescents with ASD); 19590245 (urinary biomarkers
+  for neonatal HIE prognosis; HIE is acquired, but the outcome is neurodevelopmental).
+- **False LOW: 19652018** (tip-of-the-tongue and word-retrieval deficits in dyslexia), an
+  NDD phenotype paper. It is also unstable: three repeat classifications with thinking off
+  all returned `POSSIBLE`. The cached `LOW` stays until its request hash changes.
+
+### Newly retained (5)
+
+19665851 (ADHD and obesity; one of the borderline LOWs flagged above) and 19381426
+(psychiatric prevalence cohort incl. ADHD) are improvements. 19465731 (cultural-practice
+case), 19686330 (bipolar-spectrum epidemiology), and 19686333 (hearing-loss language and
+behaviour) are over-retention. This is harmless for recall.
+
+The 12 HIGH → POSSIBLE moves are mostly the "defensible but generous" cognitive-phenotype
+papers, plus two flagged false HIGH (19637100 acquired mPFC damage, 19690953 selective
+mutism). All stay retained. `POSSIBLE` reasons now more often cite insufficient abstract
+detail, which is closer to the spec's meaning. 19494358 and 19448149 remain borderline `LOW`.
+
+### Attribution and reproducibility
+
+The 14 papers whose retention changed were re-classified without touching the cache:
+
+- Only 2 of the 14 had changed signals: 19401504 and 19441138.
+- With thinking re-enabled on the other 12 (identical payload to the baseline), 4 of 10
+  checked papers still returned a different label than the baseline run (19439760,
+  19521350, 19665851, 19697119). **Thinking mode is not reproducible at temperature 0.**
+- With thinking off, 13/14 papers returned the cached label on all three repeats. The
+  exception is 19652018 (cached `LOW`, repeats `POSSIBLE`).
+
+Conclusion: disabling thinking is about 5.5× faster and much more reproducible. It is
+stricter on treatment and intervention papers, matching the spec, and less generous with
+`HIGH`. Retention fell by 4 net, with one confirmed false LOW (19652018) and two
+borderline.
+
+## Remaining recommendations
+
+1. Optionally tighten the prompt: NDD cognitive and phenotype studies (e.g. dyslexia,
+   ASD language) are at least `POSSIBLE`; acquired brain injury is not an NDD; `POSSIBLE`
+   means insufficient metadata. Re-check 19652018, 19590245, 19669402, 19494358.
+2. Re-run screening on a debug window that includes disease-query papers.

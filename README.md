@@ -171,7 +171,9 @@ use atomic writes and checksums. PubMed searches are date-partitioned below the
 - `data/processed/article_relevance.parquet`
 - `data/processed/articles_relevant.parquet`
 - `data/processed/article_sections_relevant.parquet`
+- `data/processed/article_relevance.csv` (debug convenience copy)
 - `data/processed/relevance_debug_report.txt`
+- `data/interim/relevance/errors.jsonl` (classifier failures)
 - `data/processed/validation_report.json`
 - `data/processed/corpus_summary.json`
 - `data/processed/corpus_summary.txt`
@@ -184,7 +186,9 @@ The original article, section, and retrieval-provenance tables are never
 overwritten by screening.
 
 Successful relevance results are cached per article and complete request
-fingerprint under `data/interim/relevance/`. Missing abstracts and exhausted
-classifier retries fail open as `POSSIBLE`; transient failures are audited but
-not cached, so later runs retry them. Review `relevance_debug_report.txt` and a
+fingerprint under `data/interim/relevance/`. Articles without abstracts are
+still classified from their title, MeSH terms, keywords, publication types, and
+retrieval provenance, and the prompt prefers `POSSIBLE` when that metadata is
+insufficient. Exhausted classifier retries fail open as `POSSIBLE`; those
+failures are audited but not cached, so later runs retry them. Review `relevance_debug_report.txt` and a
 manual sample of all three classes before changing the first-run prompt.

@@ -85,21 +85,21 @@ def test_aggregate_provenance_keeps_all_unique_values_deterministically() -> Non
         {
             "pmid": "7",
             "mondo_id": "MONDO:2",
-            "retrieval_branch": "generic_ndd",
+            "retrieval_branch": "broad_ndd",
             "matched_search_term": None,
             "query_id": "q2",
         },
         {
             "pmid": "7",
             "mondo_id": "MONDO:1",
-            "retrieval_branch": "disease_name",
+            "retrieval_branch": "disease",
             "matched_search_term": "Rare syndrome",
             "query_id": "q1",
         },
         {
             "pmid": "7",
             "mondo_id": "MONDO:1",
-            "retrieval_branch": "disease_name",
+            "retrieval_branch": "disease",
             "matched_search_term": "Rare syndrome",
             "query_id": "q1",
         },
@@ -107,7 +107,7 @@ def test_aggregate_provenance_keeps_all_unique_values_deterministically() -> Non
 
     provenance = aggregate_retrieval_provenance(rows)["7"]
 
-    assert provenance.retrieval_branches == ["disease_name", "generic_ndd"]
+    assert provenance.retrieval_branches == ["broad_ndd", "disease"]
     assert provenance.mondo_ids == ["MONDO:1", "MONDO:2"]
     assert provenance.matched_search_terms == ["Rare syndrome"]
     assert provenance.query_ids == ["q1", "q2"]
@@ -320,21 +320,21 @@ def test_debug_report_has_branch_counts_examples_and_target_pmid_decisions(
     retrieval = [
         {
             "pmid": "18024065",
-            "retrieval_branch": "generic_ndd",
+            "retrieval_branch": "broad_ndd",
             "matched_search_term": None,
             "mondo_id": None,
             "query_id": "g1",
         },
         {
             "pmid": "18690540",
-            "retrieval_branch": "generic_ndd",
+            "retrieval_branch": "broad_ndd",
             "matched_search_term": None,
             "mondo_id": None,
             "query_id": "g1",
         },
         {
             "pmid": "3",
-            "retrieval_branch": "disease_name",
+            "retrieval_branch": "disease",
             "matched_search_term": "Rare syndrome",
             "mondo_id": "MONDO:3",
             "query_id": "d1",
@@ -363,3 +363,4 @@ def test_debug_report_has_branch_counts_examples_and_target_pmid_decisions(
     assert "Target PMID 18690540: LOW — rejected" in report
     assert "Methylphenidate-associated coronary vasospasm" in report
     assert "matched search term: Rare syndrome" in report
+    assert "matched disease: MONDO:3" in report

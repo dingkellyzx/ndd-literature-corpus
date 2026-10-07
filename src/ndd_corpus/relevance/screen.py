@@ -372,6 +372,7 @@ def _example_lines(
         f"- PMID: {record.pmid or '—'}",
         f"  title: {article.get('title') or '—'}",
         f"  retrieval branch: {', '.join(record.retrieval_branches) or '—'}",
+        f"  matched disease: {', '.join(record.mondo_ids) or '—'}",
         f"  matched search term: {', '.join(record.matched_search_terms) or '—'}",
         f"  relevance class: {record.relevance_label}",
         f"  evidence types: {', '.join(record.evidence_types) or '—'}",
@@ -400,9 +401,10 @@ def build_debug_report(
         f"Retention %: {retention:.2f}",
         "",
     ]
+    # Branch names match ndd_corpus.pubmed.query_builder.
     for heading, branch in (
-        ("generic-query papers", "generic_ndd"),
-        ("disease-query papers", "disease_name"),
+        ("generic-query papers", "broad_ndd"),
+        ("disease-query papers", "disease"),
     ):
         counts = _branch_label_counts(record_rows, branch)
         lines.extend(

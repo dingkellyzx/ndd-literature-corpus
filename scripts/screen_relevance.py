@@ -6,7 +6,12 @@ import sys
 import pyarrow.parquet as pq
 
 from ndd_corpus.config import Settings
-from ndd_corpus.relevance.screen import screen_articles, write_screen_outputs
+from ndd_corpus.relevance.screen import (
+    build_debug_report,
+    screen_articles,
+    write_screen_outputs,
+)
+from ndd_corpus.utils.http import atomic_write_bytes
 
 
 def main() -> int:
@@ -32,6 +37,10 @@ def main() -> int:
         settings.paths.processed,
         article_schema=articles_table.schema,
         section_schema=sections_table.schema,
+    )
+    atomic_write_bytes(
+        settings.paths.processed / "relevance_debug_report.txt",
+        build_debug_report(articles_table.to_pylist(), result.records).encode("utf-8"),
     )
     counts = result.counts()
     print(

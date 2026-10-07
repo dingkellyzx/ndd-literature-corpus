@@ -335,3 +335,107 @@ def write_screen_outputs(
         processed_dir / "article_relevance.csv",
         buffer.getvalue().encode("utf-8"),
     )
+
+
+def summarize_relevance_records(
+    records: Iterable[Mapping[str, object]],
+) -> dict[str, int]:
+    rows = list(records)
+    high = sum(row.get("relevance_label") == "HIGH" for row in rows)
+    possible = sum(row.get("relevance_label") == "POSSIBLE" for row in rows)
+    low = sum(row.get("relevance_label") == "LOW" for row in rows)
+    retained = sum(bool(row.get("eligible_for_downstream")) for row in rows)
+    return {
+        "candidate_articles": len(rows),
+        "high_relevance": high,
+        "possible_relevance": possible,
+        "low_relevance": low,
+        "articles_retained_downstream": retained,
+        "articles_removed_by_relevance_screening": len(rows) - retained,
+    }
+
+
+def _branch_label_counts(
+    records: Iterable[ArticleRelevanceRecord], branch: str
+) -> dict[str, int]:
+    counts = {"HIGH": 0, "POSSIBLE": 0, "LOW": 0}
+    for record in records:
+        if branch in record.retrieval_branches:
+            counts[record.relevance_label] += 1
+    return counts
+
+
+def _example_lines(
+    record: ArticleRelevanceRecord, article: Mapping[str, object]
+) -> list[str]:
+    return [
+        f"- PMID: {record.pmid or '—'}",
+        f"  title: {article.get('title') or '—'}",
+        f"  retrieval branch: {', '.join(record.retrieval_branches) or '—'}",
+        f"  matched search term: {', '.join(record.matched_search_terms) or '—'}",
+        f"  relevance class: {record.relevance_label}",
+        f"  evidence types: {', '.join(record.evidence_types) or '—'}",
+        f"  reason: {record.reason}",
+    ]
+
+
+def build_debug_report(
+    articles: Iterable[Mapping[str, object]],
+    records: Iterable[ArticleRelevanceRecord],
+    *,
+    examples_per_class: int = 10,
+) -> str:
+    article_by_id = {str(row["article_id"]): row for row in articles}
+    record_rows = list(records)
+    summary = summarize_relevance_records(record.model_dump() for record in record_rows)
+    candidate = summary["candidate_articles"]
+    retained = summary["articles_retained_downstream"]
+    retention = (100.0 * retained / candidate) if candidate else 0.0
+    lines = [
+        f"Candidate papers: {candidate}",
+        f"HIGH: {summary['high_relevance']}",
+        f"POSSIBLE: {summary['possible_relevance']}",
+        f"LOW: {summary['low_relevance']}",
+        f"Retained papers: {retained}",
+        f"Retention %: {retention:.2f}",
+        "",
+    ]
+    for heading, branch in (
+        ("generic-query papers", "generic_ndd"),
+        ("disease-query papers", "disease_name"),
+    ):
+        counts = _branch_label_counts(record_rows, branch)
+        lines.extend(
+            [
+                f"{heading}:",
+                f"  HIGH: {counts['HIGH']}",
+                f"  POSSIBLE: {counts['POSSIBLE']}",
+                f"  LOW: {counts['LOW']}",
+                "",
+            ]
+        )
+    for label in ("HIGH", "POSSIBLE", "LOW"):
+        matches = [record for record in record_rows if record.relevance_label == label]
+        examples = matches[:examples_per_class]
+        lines.append(f"Examples {label} ({len(examples)} of {len(matches)}):")
+        for record in examples:
+            lines.extend(_example_lines(record, article_by_id.get(record.article_id, {})))
+        if not examples:
+            lines.append("- none")
+        lines.append("")
+    for target in ("18024065", "18690540"):
+        target_record = next((item for item in record_rows if item.pmid == target), None)
+        if target_record is None:
+            lines.extend([f"Target PMID {target}: not present in candidate corpus.", ""])
+            continue
+        decision = "retained" if target_record.eligible_for_downstream else "rejected"
+        article = article_by_id.get(target_record.article_id, {})
+        lines.extend(
+            [
+                f"Target PMID {target}: {target_record.relevance_label} — {decision}",
+                f"  title: {article.get('title') or '—'}",
+                f"  reason: {target_record.reason}",
+                "",
+            ]
+        )
+    return "\n".join(lines).rstrip() + "\n"

@@ -9,6 +9,7 @@ import pyarrow.parquet as pq
 
 from ndd_corpus.config import Settings
 from ndd_corpus.corpus.validate import build_summary
+from ndd_corpus.relevance.screen import summarize_relevance_records
 from ndd_corpus.utils.http import atomic_write_bytes
 
 
@@ -37,6 +38,15 @@ def _human_report(summary: dict[str, object]) -> str:
         ("Publication year range", "publication_year_range"),
         ("Articles per decade", "articles_per_decade"),
         ("Top diseases by retrieved article count", "top_diseases_by_retrieved_article_count"),
+        ("Candidate articles", "candidate_articles"),
+        ("HIGH relevance", "high_relevance"),
+        ("POSSIBLE relevance", "possible_relevance"),
+        ("LOW relevance", "low_relevance"),
+        ("Articles retained downstream", "articles_retained_downstream"),
+        (
+            "Articles removed by relevance screening",
+            "articles_removed_by_relevance_screening",
+        ),
     ]
     return "\n".join(f"{label}: {summary[key]}" for label, key in labels) + "\n"
 
@@ -54,6 +64,11 @@ def main() -> int:
     )
     summary["mondo_ndd_descendants"] = len(
         _read(settings.paths.interim / "diseases/mondo_ndd_descendants.parquet")
+    )
+    summary.update(
+        summarize_relevance_records(
+            _read(settings.paths.processed / "article_relevance.parquet", optional=True)
+        )
     )
     atomic_write_bytes(
         settings.paths.processed / "corpus_summary.json",

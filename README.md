@@ -4,11 +4,13 @@ A reproducible, restartable Python pipeline for acquiring a high-recall
 neurodevelopmental disease literature corpus from MONDO, Orphanet, PubMed, and
 the PMC Article Dataset. It builds disease/search-term tables, retains raw XML
 and retrieval provenance, and produces canonical Parquet article and section
-tables.
+tables. An optional post-retrieval relevance-screening stage creates a
+conservative downstream extraction corpus without narrowing acquisition.
 
-This repository performs literature acquisition only. It does not extract HPO
-terms, phenotypes, onset, genes, variants, relations, embeddings, or knowledge
-graphs.
+This repository performs high-recall literature acquisition and optional
+paper-level relevance screening. It does not extract HPO terms, phenotypes,
+onset, genes, variants, relations, embeddings, or knowledge graphs. Retrieval
+provenance is never altered by relevance screening.
 
 ## Data sources and terms
 
@@ -49,6 +51,13 @@ NCBI_API_KEY=
 `NCBI_EMAIL` is required for live NCBI requests. `NCBI_API_KEY` is optional.
 The `.env` file, downloaded data, logs, and checkpoint database are ignored by
 Git. Credentials are not written into provenance tables or logs.
+
+Relevance screening uses the OpenAI-compatible local Ollama endpoint configured
+under `relevance` in `configs/default.yaml`. The default is
+`http://127.0.0.1:11434/v1` with `qwen3:14b`; install Ollama and make that model
+available before an enabled run. No OpenAI package or API key is used. Set
+`relevance.enabled: false` to retain every article through the same downstream
+file interface.
 
 ## Verify the code
 
@@ -141,6 +150,7 @@ python scripts/download_pubmed.py
 python scripts/map_pmc.py
 python scripts/download_pmc.py
 python scripts/build_corpus.py
+python scripts/screen_relevance.py
 python scripts/summarize.py
 ```
 
@@ -158,9 +168,23 @@ use atomic writes and checksums. PubMed searches are date-partitioned below the
 - `data/processed/articles.parquet`
 - `data/processed/article_sections.parquet`
 - `data/processed/article_disease_retrieval.parquet`
+- `data/processed/article_relevance.parquet`
+- `data/processed/articles_relevant.parquet`
+- `data/processed/article_sections_relevant.parquet`
+- `data/processed/relevance_debug_report.txt`
 - `data/processed/validation_report.json`
 - `data/processed/corpus_summary.json`
 - `data/processed/corpus_summary.txt`
 
-The retrieval strategy deliberately favors recall and will include irrelevant
-papers. Later NLP filtering must remain separate from retrieval provenance.
+`articles.parquet` is the complete high-recall acquisition corpus.
+`articles_relevant.parquet` is the screened corpus intended for downstream
+biomedical extraction; by default it contains `HIGH` and `POSSIBLE` papers.
+`article_relevance.parquet` audits every candidate, including `LOW` papers.
+The original article, section, and retrieval-provenance tables are never
+overwritten by screening.
+
+Successful relevance results are cached per article and complete request
+fingerprint under `data/interim/relevance/`. Missing abstracts and exhausted
+classifier retries fail open as `POSSIBLE`; transient failures are audited but
+not cached, so later runs retry them. Review `relevance_debug_report.txt` and a
+manual sample of all three classes before changing the first-run prompt.

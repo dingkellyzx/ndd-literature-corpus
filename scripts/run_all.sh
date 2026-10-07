@@ -19,6 +19,6 @@ echo "[pipeline] started ${RUN_TIMESTAMP}"
 "$PYTHON_BIN" scripts/map_pmc.py
 "$PYTHON_BIN" scripts/download_pmc.py
 "$PYTHON_BIN" scripts/build_corpus.py
+"$PYTHON_BIN" scripts/screen_relevance.py
 "$PYTHON_BIN" scripts/summarize.py
 echo "[pipeline] complete; log=$LOG_FILE"
-

@@ -54,6 +54,10 @@ class NetworkConfig(BaseModel):
     requests_per_second_with_key: float = Field(default=8.0, gt=0, le=10.0)
 
 
+def _default_relevance_keep_labels() -> list[Literal["HIGH", "POSSIBLE", "LOW"]]:
+    return ["HIGH", "POSSIBLE"]
+
+
 class RelevanceConfig(BaseModel):
     enabled: bool = True
     backend: Literal["ollama"] = "ollama"
@@ -64,7 +68,7 @@ class RelevanceConfig(BaseModel):
     max_retries: int = Field(default=2, ge=0)
     prompt_version: str = "1"
     keep_labels: list[Literal["HIGH", "POSSIBLE", "LOW"]] = Field(
-        default_factory=lambda: ["HIGH", "POSSIBLE"]
+        default_factory=_default_relevance_keep_labels
     )
 
 

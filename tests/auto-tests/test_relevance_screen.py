@@ -16,7 +16,9 @@ from ndd_corpus.relevance.models import (
 from ndd_corpus.relevance.screen import (
     RELEVANCE_SCHEMA,
     aggregate_retrieval_provenance,
+    build_debug_report,
     screen_articles,
+    summarize_relevance_records,
     write_screen_outputs,
 )
 
@@ -270,3 +272,94 @@ def test_write_outputs_preserves_input_schemas_for_empty_tables(tmp_path: Path) 
     assert (tmp_path / "processed/article_relevance.csv").read_text(encoding="utf-8").startswith(
         "article_id,"
     )
+
+
+def test_relevance_summary_keeps_acquisition_metrics_separate(tmp_path: Path) -> None:
+    classifier = CountingClassifier([_result("HIGH"), _result("POSSIBLE"), _result("LOW")])
+    screened = screen_articles(
+        [_article("PMID:1", "1"), _article("PMID:2", "2"), _article("PMID:3", "3")],
+        [],
+        [],
+        config=RelevanceConfig(),
+        cache_dir=tmp_path / "cache",
+        error_audit_path=tmp_path / "errors.jsonl",
+        classifier=classifier,
+    )
+    acquisition_summary = {"unique_pubmed_pmids": 100, "articles_with_abstracts": 90}
+
+    acquisition_summary.update(
+        summarize_relevance_records([record.model_dump() for record in screened.records])
+    )
+
+    assert acquisition_summary["unique_pubmed_pmids"] == 100
+    assert acquisition_summary["articles_with_abstracts"] == 90
+    assert acquisition_summary["candidate_articles"] == 3
+    assert acquisition_summary["high_relevance"] == 1
+    assert acquisition_summary["possible_relevance"] == 1
+    assert acquisition_summary["low_relevance"] == 1
+    assert acquisition_summary["articles_retained_downstream"] == 2
+    assert acquisition_summary["articles_removed_by_relevance_screening"] == 1
+
+
+def test_debug_report_has_branch_counts_examples_and_target_pmid_decisions(
+    tmp_path: Path,
+) -> None:
+    articles = [
+        _article(
+            "PMID:18024065",
+            "18024065",
+            title="Methylphenidate-associated coronary vasospasm",
+        ),
+        _article(
+            "PMID:18690540",
+            "18690540",
+            title="Treatment utilization and assertive outreach",
+        ),
+        _article("PMID:3", "3", title="Rare syndrome natural history"),
+    ]
+    retrieval = [
+        {
+            "pmid": "18024065",
+            "retrieval_branch": "generic_ndd",
+            "matched_search_term": None,
+            "mondo_id": None,
+            "query_id": "g1",
+        },
+        {
+            "pmid": "18690540",
+            "retrieval_branch": "generic_ndd",
+            "matched_search_term": None,
+            "mondo_id": None,
+            "query_id": "g1",
+        },
+        {
+            "pmid": "3",
+            "retrieval_branch": "disease_name",
+            "matched_search_term": "Rare syndrome",
+            "mondo_id": "MONDO:3",
+            "query_id": "d1",
+        },
+    ]
+    classifier = CountingClassifier([_result("LOW"), _result("LOW"), _result("HIGH")])
+    screened = screen_articles(
+        articles,
+        retrieval,
+        [],
+        config=RelevanceConfig(),
+        cache_dir=tmp_path / "cache",
+        error_audit_path=tmp_path / "errors.jsonl",
+        classifier=classifier,
+    )
+
+    report = build_debug_report(articles, screened.records)
+
+    assert "Candidate papers: 3" in report
+    assert "Retention %: 33.33" in report
+    assert "generic-query papers:\n  HIGH: 0\n  POSSIBLE: 0\n  LOW: 2" in report
+    assert "disease-query papers:\n  HIGH: 1\n  POSSIBLE: 0\n  LOW: 0" in report
+    assert "Examples HIGH (1 of 1)" in report
+    assert "Examples LOW (2 of 2)" in report
+    assert "Target PMID 18024065: LOW — rejected" in report
+    assert "Target PMID 18690540: LOW — rejected" in report
+    assert "Methylphenidate-associated coronary vasospasm" in report
+    assert "matched search term: Rare syndrome" in report

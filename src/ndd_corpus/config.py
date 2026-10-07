@@ -66,6 +66,7 @@ class RelevanceConfig(BaseModel):
     temperature: float = 0.0
     timeout_seconds: float = Field(default=120.0, gt=0)
     max_retries: int = Field(default=2, ge=0)
+    think: bool = False
     prompt_version: str = "1"
     keep_labels: list[Literal["HIGH", "POSSIBLE", "LOW"]] = Field(
         default_factory=_default_relevance_keep_labels

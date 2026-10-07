@@ -201,6 +201,7 @@ def screen_articles(
                 temperature=config.temperature,
                 prompt_version=config.prompt_version,
                 actual_prompt_sha256=actual_prompt_sha,
+                think=config.think,
             )
             cache_path = _cache_path(cache_dir, article_id, request_hash)
             failed_open = False

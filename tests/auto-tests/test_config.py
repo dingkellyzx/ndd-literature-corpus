@@ -88,6 +88,7 @@ def test_relevance_defaults_are_conservative_and_match_default_yaml() -> None:
     assert defaults.temperature == 0.0
     assert defaults.timeout_seconds == 120.0
     assert defaults.max_retries == 2
+    assert defaults.think is False
     assert defaults.keep_labels == ["HIGH", "POSSIBLE"]
     assert settings.relevance == defaults
 

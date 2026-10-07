@@ -56,6 +56,7 @@ class OllamaRelevanceClassifier:
             payload,
             model=self.config.model,
             temperature=self.config.temperature,
+            think=self.config.think,
         )
         attempts = self.config.max_retries + 1
         last_error: Exception | None = None

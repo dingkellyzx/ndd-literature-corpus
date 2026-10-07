@@ -55,9 +55,11 @@ Git. Credentials are not written into provenance tables or logs.
 Relevance screening uses the OpenAI-compatible local Ollama endpoint configured
 under `relevance` in `configs/default.yaml`. The default is
 `http://127.0.0.1:11434/v1` with `qwen3:14b`; install Ollama and make that model
-available before an enabled run. No OpenAI package or API key is used. Set
-`relevance.enabled: false` to retain every article through the same downstream
-file interface.
+available before an enabled run. Qwen3's thinking phase is disabled by
+default (`relevance.think: false`, sent as `reasoning_effort: "none"`); set
+`think: true` to restore the model default. No OpenAI package or API key is
+used. Set `relevance.enabled: false` to retain every article through the same
+downstream file interface.
 
 ## Verify the code
 

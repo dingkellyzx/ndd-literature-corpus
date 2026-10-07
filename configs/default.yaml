@@ -44,6 +44,8 @@ relevance:
   temperature: 0.0
   timeout_seconds: 120
   max_retries: 2
+  # false sends reasoning_effort "none" so Qwen3 skips its thinking phase.
+  think: false
   prompt_version: "1"
   keep_labels:
     - HIGH

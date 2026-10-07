@@ -104,11 +104,13 @@ def compute_request_hash(
     temperature: float,
     prompt_version: str,
     actual_prompt_sha256: str,
+    think: bool,
 ) -> str:
     material = {
         "payload": payload,
         "model": model,
         "temperature": temperature,
+        "think": think,
         "prompt_version": prompt_version,
         "prompt_sha256": actual_prompt_sha256,
     }
@@ -116,14 +118,14 @@ def compute_request_hash(
 
 
 def build_chat_request(
-    payload: Mapping[str, object], *, model: str, temperature: float
+    payload: Mapping[str, object], *, model: str, temperature: float, think: bool
 ) -> dict[str, object]:
     schema = _response_schema()
     user_prompt = _USER_PROMPT_PREFIX.format(
         schema=json.dumps(schema, ensure_ascii=False, sort_keys=True),
         payload=json.dumps(payload, ensure_ascii=False, sort_keys=True),
     )
-    return {
+    request: dict[str, object] = {
         "model": model,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -140,3 +142,6 @@ def build_chat_request(
             },
         },
     }
+    if not think:
+        request["reasoning_effort"] = "none"
+    return request

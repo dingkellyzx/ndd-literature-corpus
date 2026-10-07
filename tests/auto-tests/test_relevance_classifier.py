@@ -92,7 +92,9 @@ def test_prompt_payload_uses_only_allowed_article_metadata() -> None:
 
 def test_chat_request_uses_openai_compatible_structured_output() -> None:
     payload = article_prompt_payload(_article(), _provenance(), _signals())
-    request = build_chat_request(payload, model="qwen3:14b", temperature=0.0)
+    request = build_chat_request(
+        payload, model="qwen3:14b", temperature=0.0, think=False
+    )
 
     assert request["model"] == "qwen3:14b"
     assert request["temperature"] == 0.0
@@ -102,6 +104,14 @@ def test_chat_request_uses_openai_compatible_structured_output() -> None:
     assert response_format["type"] == "json_schema"
     assert response_format["json_schema"]["strict"] is True
     assert response_format["json_schema"]["schema"]["additionalProperties"] is False
+    assert request["reasoning_effort"] == "none"
+
+
+def test_chat_request_leaves_model_default_reasoning_when_thinking_enabled() -> None:
+    payload = article_prompt_payload(_article(), _provenance(), _signals())
+    request = build_chat_request(payload, model="qwen3:14b", temperature=0.0, think=True)
+
+    assert "reasoning_effort" not in request
 
 
 @pytest.mark.parametrize(
@@ -127,6 +137,7 @@ def test_request_hash_changes_with_every_article_input(
         "temperature": 0.0,
         "prompt_version": "1",
         "actual_prompt_sha256": "a" * 64,
+        "think": False,
     }
 
     assert compute_request_hash(payload, **common) != compute_request_hash(changed, **common)
@@ -139,6 +150,7 @@ def test_request_hash_changes_with_every_article_input(
         ("temperature", 0.2),
         ("prompt_version", "2"),
         ("actual_prompt_sha256", "b" * 64),
+        ("think", True),
     ],
 )
 def test_request_hash_changes_with_classifier_settings(
@@ -150,6 +162,7 @@ def test_request_hash_changes_with_classifier_settings(
         "temperature": 0.0,
         "prompt_version": "1",
         "actual_prompt_sha256": "a" * 64,
+        "think": False,
     }
     original = compute_request_hash(payload, **settings)
     settings[changed_setting] = value
@@ -172,6 +185,7 @@ def test_classifier_posts_to_ollama_and_validates_each_label(label: str) -> None
     assert route.call_count == 1
     sent = json.loads(route.calls[0].request.content)
     assert sent["response_format"]["type"] == "json_schema"
+    assert sent["reasoning_effort"] == "none"
     assert "pmc_full_text" not in json.dumps(sent)
 
 

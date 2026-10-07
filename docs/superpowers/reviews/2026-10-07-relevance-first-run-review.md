@@ -208,8 +208,8 @@ detail, which is closer to the spec's meaning. 19494358 and 19448149 remain bord
 The 14 papers whose retention changed were re-classified without touching the cache:
 
 - Only 2 of the 14 had changed signals: 19401504 and 19441138.
-- With thinking re-enabled on the other 12 (identical payload to the baseline), 4 of 10
-  checked papers still returned a different label than the baseline run (19439760,
+- With thinking re-enabled on the other 12 (identical payload to the baseline), 4 of 12
+  still returned a different label than the baseline run (19439760,
   19521350, 19665851, 19697119). **Thinking mode is not reproducible at temperature 0.**
 - With thinking off, 13/14 papers returned the cached label on all three repeats. The
   exception is 19652018 (cached `LOW`, repeats `POSSIBLE`).

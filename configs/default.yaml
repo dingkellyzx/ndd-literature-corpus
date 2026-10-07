@@ -36,6 +36,19 @@ network:
   requests_per_second_without_key: 2.5
   requests_per_second_with_key: 8.0
 
+relevance:
+  enabled: true
+  backend: ollama
+  base_url: "http://127.0.0.1:11434/v1"
+  model: "qwen3:14b"
+  temperature: 0.0
+  timeout_seconds: 120
+  max_retries: 2
+  prompt_version: "1"
+  keep_labels:
+    - HIGH
+    - POSSIBLE
+
 paths:
   data: data
   raw: data/raw

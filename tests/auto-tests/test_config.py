@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from ndd_corpus.config import PubmedConfig, Settings
+from pydantic import ValidationError
+
+from ndd_corpus.config import PubmedConfig, RelevanceConfig, Settings
 
 
 def _write_config(path: Path) -> None:
@@ -71,3 +73,35 @@ def test_default_pubmed_window_is_2010_through_2020() -> None:
 
     assert (defaults.start_year, defaults.end_year) == (2010, 2020)
     assert (settings.pubmed.start_year, settings.pubmed.end_year) == (2010, 2020)
+
+
+def test_relevance_defaults_are_conservative_and_match_default_yaml() -> None:
+    defaults = RelevanceConfig()
+    repository_root = Path(__file__).resolve().parents[2]
+    settings = Settings.load(
+        repository_root / "configs/default.yaml",
+        env={"NCBI_EMAIL": "owner@example.org"},
+    )
+
+    assert defaults.backend == "ollama"
+    assert defaults.base_url == "http://127.0.0.1:11434/v1"
+    assert defaults.model == "qwen3:14b"
+    assert defaults.temperature == 0.0
+    assert defaults.timeout_seconds == 120.0
+    assert defaults.max_retries == 2
+    assert defaults.keep_labels == ["HIGH", "POSSIBLE"]
+    assert settings.relevance == defaults
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("timeout_seconds", 0), ("max_retries", -1)],
+)
+def test_relevance_config_rejects_invalid_retry_limits(field: str, value: int) -> None:
+    with pytest.raises(ValidationError):
+        RelevanceConfig(**{field: value})
+
+
+def test_relevance_config_rejects_unknown_keep_label() -> None:
+    with pytest.raises(ValidationError):
+        RelevanceConfig(keep_labels=["HIGH", "MAYBE"])  # type: ignore[list-item]

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from dotenv import dotenv_values
@@ -54,6 +54,20 @@ class NetworkConfig(BaseModel):
     requests_per_second_with_key: float = Field(default=8.0, gt=0, le=10.0)
 
 
+class RelevanceConfig(BaseModel):
+    enabled: bool = True
+    backend: Literal["ollama"] = "ollama"
+    base_url: str = "http://127.0.0.1:11434/v1"
+    model: str = "qwen3:14b"
+    temperature: float = 0.0
+    timeout_seconds: float = Field(default=120.0, gt=0)
+    max_retries: int = Field(default=2, ge=0)
+    prompt_version: str = "1"
+    keep_labels: list[Literal["HIGH", "POSSIBLE", "LOW"]] = Field(
+        default_factory=lambda: ["HIGH", "POSSIBLE"]
+    )
+
+
 class PathsConfig(BaseModel):
     data: Path = Path("data")
     raw: Path = Path("data/raw")
@@ -83,6 +97,7 @@ class Settings(BaseModel):
     pubmed: PubmedConfig = Field(default_factory=PubmedConfig)
     pmc: PmcConfig = Field(default_factory=PmcConfig)
     network: NetworkConfig = Field(default_factory=NetworkConfig)
+    relevance: RelevanceConfig = Field(default_factory=RelevanceConfig)
     paths: PathsConfig = Field(default_factory=PathsConfig)
     debug: DebugConfig = Field(default_factory=DebugConfig)
     repository_root: Path
